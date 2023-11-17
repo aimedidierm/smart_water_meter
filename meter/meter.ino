@@ -1,101 +1,137 @@
+#include <LiquidCrystal_I2C.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <Wire.h> 
-#include <LiquidCrystal_I2C.h>
-#define SS_PIN 10
-#define RST_PIN 9
-MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance.
 
+int lcdColumns = 16;
+int lcdRows = 2;
+byte block;
+byte len;
+LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
 int Interrupt = 0;
-int sensorPin       = 2;
-#define Valve A2
-#define red A1
-float calibrationFactor = 90; 
-volatile byte pulseCount =0;  
+int sensorPin = A3;
+#define Valve 2
+#define red 5
+#define green 4
+float calibrationFactor = 90;
+volatile byte pulseCount = 0;
 float flowRate = 0.0;
-unsigned int flowMilliLitres =0;
+unsigned int flowMilliLitres = 0;
 unsigned long totalMilliLitres = 270;
 unsigned long oldTime = 0;
+byte buffer1[18];
+#define SS_PIN 10
+#define RST_PIN 9
+MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance
+MFRC522::MIFARE_Key key;
+MFRC522::StatusCode status;
+String value = "";
+int drinkvolume = 0;
 
-LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
-
-int drinkvolume=2000;
-String tagID = "";
-void setup() 
+void setup()
 {
-  lcd.init();                      // initialize the lcd 
-  lcd.init();
-  SPI.begin();  
-  Serial.begin(115200);   // Initiate a serial communication
-  SPI.begin();      // Initiate  SPI bus
-  mfrc522.PCD_Init();   // Initiate MFRC522
-  pinMode(Valve , OUTPUT);
+  SPI.begin(); // Init SPI bus
+  mfrc522.PCD_Init();
+  pinMode(Valve, OUTPUT);
   digitalWrite(Valve, HIGH);
   pinMode(sensorPin, INPUT);
   digitalWrite(sensorPin, HIGH);
   attachInterrupt(Interrupt, pulseCounter, FALLING);
+  lcd.init();
   lcd.backlight();
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Smart water");
-  lcd.setCursor(0,1);
+  lcd.setCursor(0, 0);
+  lcd.print("Prepayment water");
+  lcd.setCursor(0, 1);
   lcd.print("meter");
-  delay(5000);
-
+  delay(3000);
+  Serial.begin(9600);
 }
 
-void loop() 
+void loop()
 {
-  if (getID()){
-    //Read data on card
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("Reading data");
-    delay(2000);
-   // readdata();
-  }/*
-  digitalWrite(Valve, HIGH);
-    while(drinkvolume>20){
-      if((millis() - oldTime) > 1000)    // Only process counters once per second
-  { 
-    detachInterrupt(Interrupt);
-    flowRate = ((1000.0 / (millis() - oldTime)) * pulseCount) / calibrationFactor;
-    oldTime = millis();
-    flowMilliLitres = (flowRate / 60) * 1000;
-    drinkvolume -= flowMilliLitres;
- 
-    unsigned int frac;
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print(drinkvolume);
-    pulseCount = 0;
-    attachInterrupt(Interrupt, pulseCounter, FALLING);
+  for (byte i = 0; i < 6; i++)
+    key.keyByte[i] = 0xFF;
+  byte block;
+  byte len;
+  if (!mfrc522.PICC_IsNewCardPresent())
+  {
+    return;
   }
-      }
-    digitalWrite(Valve,LOW);*/
+  if (!mfrc522.PICC_ReadCardSerial())
+  {
+    return;
+  }
+  lcd.clear();
+  lcd.print("Card Detected");
+  delay(1000);
+  byte buffer1[18];
+  block = 4;
+  len = 18;
+  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, 4, &key, &(mfrc522.uid));
+  if (status != MFRC522::STATUS_OK)
+  {
+    Serial.print(F("Authentication failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  status = mfrc522.MIFARE_Read(block, buffer1, &len);
+  if (status != MFRC522::STATUS_OK)
+  {
+    lcd.clear();
+    lcd.print("Reading failed: ");
+    delay(1000);
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  for (uint8_t i = 0; i < 16; i++)
+  {
+    value += (char)buffer1[i];
+  }
+  value.trim();
+  lcd.clear();
+
+  // Convert the value to an integer and assign it to drinkvolume
+  drinkvolume = value.toInt();
+  lcd.setCursor(0, 0);
+  lcd.print(value.toInt());
+  lcd.print("Rwf");
+  lcd.setCursor(0, 1);
+  lcd.print("Money loaded");
+  delay(3000);
+
+  mfrc522.PICC_HaltA();
+  mfrc522.PCD_StopCrypto1();
+  waterout();
 }
-/*
-readdata(){
-  
+
+void waterout()
+{
+  digitalWrite(Valve, HIGH);
+  while (drinkvolume > 20)
+  {
+    if ((millis() - oldTime) > 1000) // Only process counters once per second
+    {
+      detachInterrupt(Interrupt);
+      flowRate = ((1000.0 / (millis() - oldTime)) * pulseCount) / calibrationFactor;
+      oldTime = millis();
+      flowMilliLitres = (flowRate / 60) * 1000;
+      drinkvolume -= flowMilliLitres;
+
+      unsigned int frac;
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(drinkvolume);
+      lcd.print("ml");
+      pulseCount = 0;
+      attachInterrupt(Interrupt, pulseCounter, FALLING);
+    }
   }
-  */
+  digitalWrite(Valve, LOW);
+  drinkvolume = 0;
+}
 
 void pulseCounter()
 {
   pulseCount++;
 }
-boolean getID(){
-  if(!mfrc522.PICC_IsNewCardPresent()){
-    return false;
-    }
-  if(!mfrc522.PICC_ReadCardSerial()){
-    return false;
-    }
-    tagID = "";
-    for (uint8_t i = 0; i < 4; i++){
-      tagID.concat(String(mfrc522.uid.uidByte[i], HEX));
-      }
-      tagID.toUpperCase();
-      mfrc522.PICC_HaltA();
-      return true;
-  }
+
+void (*resetFunc)(void) = 0;

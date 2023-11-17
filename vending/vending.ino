@@ -1,31 +1,31 @@
 #include <SPI.h>
 #include <MFRC522.h>
-#include <Wire.h> 
+#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 const uint8_t RST_PIN = 9;
 const uint8_t SS_PIN = 10;
-LiquidCrystal_I2C lcd(0x27,20,4);
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 const byte ROWS = 4; //four rows
-const byte COLS = 4; //four columns
+const byte COLS = 3; //four columns
 //define the cymbols on the buttons of the keypads
-char newNum[12]="";
-String water="";
+char newNum[12] = "";
+String water = "";
 //define the cymbols on the buttons of the keypads
 char keys[ROWS][COLS] = {
 
-    {'1','2','3'},
+  {'1', '2', '3'},
 
-    {'4','5','6'},
+  {'4', '5', '6'},
 
-    {'7','8','9'},
+  {'7', '8', '9'},
 
-    {'*','0','#'}
+  {'*', '0', '#'}
 
 };
-byte rowPins[ROWS] = {6, A1, A2, A3}; //connect to the row pinouts of the keypad
-byte colPins[COLS] = {8, 9, 7};
+byte rowPins[ROWS] = {2, 3, 4, 5}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {6, 7, 8};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 MFRC522::MIFARE_Key key;
 int blockNum = 4;
@@ -33,9 +33,9 @@ byte block_data[16];
 byte bufferLen = 18;
 byte readBlockData[18];
 MFRC522::StatusCode status;
-const int green =  3;
-const int red =  4;
-void setup() 
+const int green =  A2;
+const int red =  A3;
+void setup()
 {
   Serial.begin(9600);
   SPI.begin();
@@ -49,9 +49,9 @@ void setup()
   lcd.backlight();
   SPI.begin();
   mfrc522.PCD_Init();
-  lcd.setCursor(0,0);
+  lcd.setCursor(0, 0);
   lcd.print("Recharging");
-  lcd.setCursor(0,1);
+  lcd.setCursor(0, 1);
   lcd.print("Machine");
   delay(3000);
   lcd.clear();
@@ -60,19 +60,23 @@ void setup()
 }
 void loop()
 {
-  for (byte i = 0; i < 6; i++){
+  for (byte i = 0; i < 6; i++) {
     key.keyByte[i] = 0xFF;
   }
-  if ( ! mfrc522.PICC_IsNewCardPresent()){return;}
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {
+    return;
+  }
   /* Select one of the cards */
-  if ( ! mfrc522.PICC_ReadCardSerial()) {return;}
+  if ( ! mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
   Serial.print("\n");
   lcd.clear();
   lcd.print("Card Detected");
   delay(1000);
   Serial.println("**Card Detected**");
   Serial.print(F("Card UID:"));
-  for (byte i = 0; i < mfrc522.uid.size; i++){
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
     Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
     Serial.print(mfrc522.uid.uidByte[i], HEX);
   }
@@ -81,51 +85,63 @@ void loop()
   Serial.print(F("PICC type: "));
   MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
   Serial.println(mfrc522.PICC_GetTypeName(piccType));
-  int i=0,j=0,m=0,x=0,s=0,k=0;
+  int i = 0, j = 0, m = 0, x = 0, s = 0, k = 0;
   lcd.clear();
-  lcd.setCursor(0,0);
+  lcd.setCursor(0, 0);
   lcd.print("Enter amount");
-  lcd.setCursor(0,1);
+  lcd.setCursor(0, 1);
   lcd.print("and press#");
   delay(2000);
   lcd.clear();
-  lcd.setCursor(0,0);
+  lcd.setCursor(0, 0);
   lcd.print("Enter amount");
-  for(i=2;i>0;i++){
-    lcd.setCursor(0,1);
+  lcd.setCursor(0, 1);
+  lcd.print("and press#");
+  delay(2000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Enter amount");
+
+  for (i = 2; i > 0; i++)
+  {
+    lcd.setCursor(0, 1);
     int key = keypad.getKey();
-    if (key!=NO_KEY && key!='#' && key!='*'){
-        newNum[j] = key;
-        newNum[j+1]='\0';   
-        j++;
-        lcd.clear();
-        lcd.setCursor(0,1);
-        lcd.print(newNum);
-    }
-    if (key=='#'&& j>0)
+
+    if (key != NO_KEY && key != '#' && key != '*')
     {
-        j=0;
-        break;
-        }
-    delay(100);
+      newNum[j] = key;
+      newNum[j + 1] = '\0';
+      j++;
+      lcd.clear();
+      lcd.setCursor(0, 1);
+      lcd.print(newNum);
     }
-    blockNum = 4;
-    toBlockDataArray(newNum); //Student ID
-    WriteDataToBlock(blockNum, block_data);
-    ReadDataFromBlock(blockNum, readBlockData);
-    dumpSerial(blockNum, readBlockData);
+
+    if (key == '#' && j > 0)
+    {
+      j = 0;
+      break;
+    }
+    delay(100);
+  }
+  int amount = atoi(newNum);
+  blockNum = 4;
+  toBlockDataArray(String(amount));
+  WriteDataToBlock(blockNum, block_data);
+  ReadDataFromBlock(blockNum, readBlockData);
+  dumpSerial(blockNum, readBlockData);
 }
 /****************************************************************************************************
- * Writ() function
+   Writ() function
  ****************************************************************************************************/
-void WriteDataToBlock(int blockNum, byte blockData[]) 
+void WriteDataToBlock(int blockNum, byte blockData[])
 {
-   Serial.print("Writing data on block ");
-   Serial.print(blockNum);
+  Serial.print("Writing data on block ");
+  Serial.print(blockNum);
   //------------------------------------------------------------------------------
   /* Authenticating the desired data block for write access using Key A */
   status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNum, &key, &(mfrc522.uid));
-  if (status != MFRC522::STATUS_OK){
+  if (status != MFRC522::STATUS_OK) {
     Serial.print("Authentication failed for Write: ");
     lcd.clear();
     lcd.print("Fail");
@@ -147,29 +163,29 @@ void WriteDataToBlock(int blockNum, byte blockData[])
     return;
   }
   else
-  {Serial.println("Data was written into Block successfully");
-  lcd.clear();
+  { Serial.println("Data was written into Block successfully");
+    lcd.clear();
     lcd.print("Money added");
     digitalWrite(green, HIGH);
     delay(2000);
-    }
+  }
   //------------------------------------------------------------------------------
 }
 /****************************************************************************************************
- * ReadDataFromBlock() function
+   ReadDataFromBlock() function
  ****************************************************************************************************/
-void ReadDataFromBlock(int blockNum, byte readBlockData[]) 
+void ReadDataFromBlock(int blockNum, byte readBlockData[])
 {
-   Serial.print("Reading data from block ");
-   Serial.println(blockNum);
+  Serial.print("Reading data from block ");
+  Serial.println(blockNum);
   //------------------------------------------------------------------------------
   /* Authenticating the desired data block for Read access using Key A */
   status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNum, &key, &(mfrc522.uid));
   //------------------------------------------------------------------------------
-  if (status != MFRC522::STATUS_OK){
-   Serial.print("Authentication failed for Read: ");
-   Serial.println(mfrc522.GetStatusCodeName(status));
-   return;
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print("Authentication failed for Read: ");
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
   }
   else {
     Serial.println("Authentication success");
@@ -177,13 +193,13 @@ void ReadDataFromBlock(int blockNum, byte readBlockData[])
   //------------------------------------------------------------------------------
   /* Reading data from the Block */
   status = mfrc522.MIFARE_Read(blockNum, readBlockData, &bufferLen);
-  if (status != MFRC522::STATUS_OK){
+  if (status != MFRC522::STATUS_OK) {
     Serial.print("Reading failed: ");
     Serial.println(mfrc522.GetStatusCodeName(status));
     return;
   }
   else {
-    Serial.println("Block was read successfully");  
+    Serial.println("Block was read successfully");
   }
   //------------------------------------------------------------------------------
 }
@@ -191,29 +207,32 @@ void ReadDataFromBlock(int blockNum, byte readBlockData[])
 
 
 /****************************************************************************************************
- * dumpSerial() function
+   dumpSerial() function
  ****************************************************************************************************/
-void dumpSerial(int blockNum, byte blockData[]) 
+void dumpSerial(int blockNum, byte blockData[])
 {
-   Serial.print("\n");
-   Serial.print("Data in Block:");
-   Serial.print(blockNum);
-   Serial.print(" --> ");
-   for (int j=0 ; j<16 ; j++){
-     Serial.write(readBlockData[j]);
-   }
-   Serial.print("\n");Serial.print("\n");
+  Serial.print("\n");
+  Serial.print("Data in Block:");
+  Serial.print(blockNum);
+  Serial.print(" --> ");
+  for (int j = 0 ; j < 16 ; j++) {
+    Serial.write(readBlockData[j]);
+  }
+  Serial.print("\n"); Serial.print("\n");
 }
 
 
 /****************************************************************************************************
- * dumpSerial() function
+   dumpSerial() function
  ****************************************************************************************************/
-void toBlockDataArray(String str) 
+void toBlockDataArray(String str)
 {
   byte len = str.length();
-  if(len > 16) len = 16;
-  for (byte i = 0; i < len; i++) block_data[i] = str[i];
-  for (byte i = len; i < 16; i++) block_data[i] = ' ';
+  if (len > 16)
+    len = 16;
+  for (byte i = 0; i < len; i++)
+    block_data[i] = str[i];
+  for (byte i = len; i < 16; i++)
+    block_data[i] = ' ';
 }
 void(* resetFunc) (void) = 0;
