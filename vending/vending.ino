@@ -21,7 +21,7 @@ char keys[ROWS][COLS] = {
 
   {'7', '8', '9'},
 
-  {'*', '0', '#'}
+  {'1', '0', '#'}
 
 };
 byte rowPins[ROWS] = {2, 3, 4, 5}; //connect to the row pinouts of the keypad

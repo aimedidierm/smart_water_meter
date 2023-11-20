@@ -8,10 +8,11 @@ byte block;
 byte len;
 LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
 int Interrupt = 0;
-int sensorPin = A3;
-#define Valve 2
-#define red 5
-#define green 4
+int sensorPin = 2;
+#define Valve A3
+#define red 
+#define green 5
+#define buzzer 3
 float calibrationFactor = 90;
 volatile byte pulseCount = 0;
 float flowRate = 0.0;
@@ -90,7 +91,7 @@ void loop()
   lcd.clear();
 
   // Convert the value to an integer and assign it to drinkvolume
-  drinkvolume = value.toInt();
+  drinkvolume = value.toInt()/5;
   lcd.setCursor(0, 0);
   lcd.print(value.toInt());
   lcd.print("Rwf");
@@ -99,13 +100,13 @@ void loop()
   delay(3000);
 
   mfrc522.PICC_HaltA();
-  mfrc522.PCD_StopCrypto1();
+  mfrc522.PCD_StopCrypto1(); 
   waterout();
 }
 
 void waterout()
 {
-  digitalWrite(Valve, HIGH);
+  digitalWrite(Valve, LOW);
   while (drinkvolume > 20)
   {
     if ((millis() - oldTime) > 1000) // Only process counters once per second
@@ -125,7 +126,7 @@ void waterout()
       attachInterrupt(Interrupt, pulseCounter, FALLING);
     }
   }
-  digitalWrite(Valve, LOW);
+  digitalWrite(Valve, HIGH);
   drinkvolume = 0;
 }
 
