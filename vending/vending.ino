@@ -7,6 +7,10 @@ const uint8_t RST_PIN = 9;
 const uint8_t SS_PIN = 10;
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+
+void(* resetFunc) (void) = 0;
+
 const byte ROWS = 4; //four rows
 const byte COLS = 3; //four columns
 //define the cymbols on the buttons of the keypads
@@ -44,6 +48,8 @@ void setup()
   Serial.begin(9600);
   pinMode(green, OUTPUT);
   pinMode(red, OUTPUT);
+  digitalWrite(green, LOW);
+  digitalWrite(red, LOW);
   lcd.init();
   lcd.init();
   lcd.backlight();
@@ -146,7 +152,8 @@ void WriteDataToBlock(int blockNum, byte blockData[])
     lcd.clear();
     lcd.print("Fail");
     digitalWrite(red, HIGH);
-    delay(2000);
+    delay(4000);
+    resetFunc();
     Serial.println(mfrc522.GetStatusCodeName(status));
     return;
   }
@@ -165,9 +172,10 @@ void WriteDataToBlock(int blockNum, byte blockData[])
   else
   { Serial.println("Data was written into Block successfully");
     lcd.clear();
-    lcd.print("Money added");
+    lcd.print("Money loaded");
     digitalWrite(green, HIGH);
-    delay(2000);
+    delay(4000);
+    resetFunc();
   }
   //------------------------------------------------------------------------------
 }
@@ -235,4 +243,3 @@ void toBlockDataArray(String str)
   for (byte i = len; i < 16; i++)
     block_data[i] = ' ';
 }
-void(* resetFunc) (void) = 0;

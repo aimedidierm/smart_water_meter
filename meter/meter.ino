@@ -23,10 +23,13 @@ byte buffer1[18];
 #define SS_PIN 10
 #define RST_PIN 9
 MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance
+
+void (*resetFunc)(void) = 0;
+
 MFRC522::MIFARE_Key key;
 MFRC522::StatusCode status;
-String value = "";
-int drinkvolume = 0;
+uint32_t cardValue = 0;
+int drinkvolume = 0; // Declare drinkvolume variable here
 
 void setup()
 {
@@ -83,22 +86,51 @@ void loop()
     Serial.println(mfrc522.GetStatusCodeName(status));
     return;
   }
-  for (uint8_t i = 0; i < 16; i++)
-  {
-    value += (char)buffer1[i];
+  
+  uint32_t cardValue = 0;
+  for (uint8_t i = 0; i < 4; i++) {
+    cardValue |= (uint32_t)buffer1[i] << (8 * (3 - i));
   }
-  value.trim();
+
   lcd.clear();
 
   // Convert the value to an integer and assign it to drinkvolume
-  drinkvolume = value.toInt()/5;
+  drinkvolume = cardValue / 5; // Assuming conversion factor 5, adjust as needed
   lcd.setCursor(0, 0);
-  lcd.print(value.toInt());
+  lcd.print(drinkvolume);
   lcd.print("Rwf");
   lcd.setCursor(0, 1);
   lcd.print("Money loaded");
   delay(3000);
 
+  // Write 0 data onto the card
+  int newAmount = 0;
+
+  // Convert the new amount back to byte array
+  byte newBlockData[16];
+  for (int i = 0; i < 16; i++) {
+    if (i % 2 == 0) {
+      newBlockData[i] = (newAmount >> 8) & 0xFF;
+    } else {
+      newBlockData[i] = newAmount & 0xFF;
+    }
+  }
+
+  // Write data to the block
+  status = mfrc522.MIFARE_Write(blockNum, newBlockData, 16);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print("Writing to Block failed: ");
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  } else {
+    Serial.println("Data was written into Block successfully");
+    lcd.clear();
+    lcd.print("Money added");
+    digitalWrite(green, HIGH);
+    delay(4000);
+    resetFunc();
+  }
+  
   mfrc522.PICC_HaltA();
   mfrc522.PCD_StopCrypto1(); 
   waterout();
@@ -135,4 +167,3 @@ void pulseCounter()
   pulseCount++;
 }
 
-void (*resetFunc)(void) = 0;
