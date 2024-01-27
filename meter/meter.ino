@@ -10,7 +10,7 @@ LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
 int Interrupt = 0;
 int sensorPin = 2;
 #define Valve A3
-#define red
+#define red 6
 #define green 5
 #define buzzer 3
 float calibrationFactor = 90;
@@ -36,6 +36,10 @@ void setup()
   SPI.begin(); // Init SPI bus
   mfrc522.PCD_Init();
   pinMode(Valve, OUTPUT);
+  pinMode(green, OUTPUT);
+  pinMode(red, OUTPUT);
+  digitalWrite(red, LOW);
+  digitalWrite(green, LOW);
   digitalWrite(Valve, HIGH);
   pinMode(sensorPin, INPUT);
   digitalWrite(sensorPin, HIGH);
@@ -107,19 +111,21 @@ void loop()
 
   // Convert the value to an integer and assign it to drinkvolume
   drinkvolume = value.toInt() / 5;
+  if(drinkvolume == 0){
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Card Low balance");
+    digitalWrite(red, HIGH);
+    delay(3000);
+    resetFunc();
+  }
+  digitalWrite(green, HIGH);
   lcd.setCursor(0, 0);
   lcd.print(value.toInt());
   lcd.print("Rwf");
   lcd.setCursor(0, 1);
   lcd.print("Money loaded");
   delay(3000);
-  if(drinkvolume == 0){
-    lcd.clear();
-    lcd.setCursor(0, 1);
-    lcd.print("Card Low balance");
-    delay(3000);
-    resetFunc();
-  }
   mfrc522.PICC_HaltA();
   mfrc522.PCD_StopCrypto1();
   waterout();
@@ -149,6 +155,7 @@ void waterout()
   }
   digitalWrite(Valve, HIGH);
   drinkvolume = 0;
+  digitalWrite(red, HIGH);
   resetFunc();
 }
 
